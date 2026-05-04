@@ -1,0 +1,76 @@
+@startuml
+title Ключевые события и их поток
+
+left to right direction
+
+' Акторы-источники
+rectangle "Customer Context" as CC #DDEAF6
+rectangle "Medical Context" as MC #D5E8D4
+rectangle "Fintech Context" as FC #FFF2CC
+rectangle "AI Context" as AIC #F8CECC
+
+' Шина
+component "Event Hub (Kafka)" as EH #F5F5F5
+
+' Подписчик
+component "Reporting Context\n(Stream Processor)" as RC #E1D5E7
+
+' События – прямоугольники внутри источников (стилизованные)
+component "CustomerCreated" as e1 #CCE5FF
+component "CustomerUpdated" as e2 #CCE5FF
+
+component "PatientRegistered" as e3 #D4EDDA
+component "DiagnosisRecorded" as e4 #D4EDDA
+component "PrescriptionIssued" as e5 #D4EDDA
+component "MedicalTestCompleted" as e6 #D4EDDA
+
+component "CreditAgreementCreated" as e7 #FFF3CD
+component "PaymentReceived" as e8 #FFF3CD
+component "AccountOpened" as e9 #FFF3CD
+
+component "AnalysisRequested" as e10 #F1B0B7
+component "AnalysisCompleted" as e11 #F1B0B7
+component "ModelTrained" as e12 #F1B0B7
+
+' Связи публикации
+e1 -down-> EH
+e2 -down-> EH
+e3 -down-> EH
+e4 -down-> EH
+e5 -down-> EH
+e6 -down-> EH
+e7 -down-> EH
+e8 -down-> EH
+e9 -down-> EH
+e10 -down-> EH
+e11 -down-> EH
+e12 -down-> EH
+
+' Потребление
+EH -down-> RC
+
+' Размещение элементов внутри контекстов (layout)
+CC -[hidden]-> MC
+MC -[hidden]-> FC
+FC -[hidden]-> AIC
+
+e1 -[hidden]up-> CC
+e2 -[hidden]up-> CC
+e3 -[hidden]up-> MC
+e4 -[hidden]up-> MC
+e5 -[hidden]up-> MC
+e6 -[hidden]up-> MC
+e7 -[hidden]up-> FC
+e8 -[hidden]up-> FC
+e9 -[hidden]up-> FC
+e10 -[hidden]up-> AIC
+e11 -[hidden]up-> AIC
+e12 -[hidden]up-> AIC
+
+note right of EH
+  Все события зарегистрированы
+  в Schema Registry (Avro).
+  Настроена DLQ.
+end note
+
+@enduml
