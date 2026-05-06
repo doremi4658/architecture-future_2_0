@@ -1,0 +1,32 @@
+@startuml
+!include <C4/C4_Component>
+
+LAYOUT_TOP_DOWN()
+
+title Self-Service Portal — компонентная диаграмма
+
+Container_Boundary(portal, "Self-Service Portal") {
+    Component(web_ui, "Web UI", "React", "Интерактивная витрина данных для бизнес-пользователей")
+    Component(report_builder, "Report Builder", "Node.js", "Конструктор отчётов, движок метрик")
+    Component(query_engine, "Query Engine", "Trino / Presto", "Федеративные SQL-запросы к Data Lake и витринам")
+    Component(cache_layer, "Cache Layer", "Redis", "Кэш часто запрашиваемых агрегатов")
+    Component(authz, "Authz Proxy", "OAuth2 / OPA", "Проверка прав доступа на каждый запрос")
+    Component(dataset_catalog, "Dataset Catalog API", "FastAPI", "Доступ к каталогу разрешённых датасетов (через Atlas)")
+
+    Rel(web_ui, report_builder, "REST API", "JSON")
+    Rel(report_builder, query_engine, "SQL", "JDBC")
+    Rel(report_builder, cache_layer, "Кэширование", "Redis protocol")
+    Rel(report_builder, authz, "Проверить права", "gRPC")
+    Rel(report_builder, dataset_catalog, "Получить структуру", "REST")
+    Rel(authz, dataset_catalog, "Проверить политику", "REST")
+}
+
+System_Ext(storage, "Storage Layer (S3)", "Parquet через Hive Metastore")
+System_Ext(event_hub, "Event Hub", "Kafka Topics")
+System_Ext(catalog, "Metadata Catalog", "Apache Atlas")
+
+Rel(query_engine, storage, "Читает файлы Parquet", "S3 Select / Hive")
+Rel(dataset_catalog, catalog, "Синхронизация метаданных", "REST")
+Rel(event_hub, storage, "Обновление витрин", "Streaming")
+
+@enduml

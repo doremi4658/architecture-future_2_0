@@ -1,0 +1,34 @@
+@startuml
+!include <C4/C4_Container>
+
+LAYOUT_TOP_DOWN()
+
+title Контексты (Bounded Contexts) «Будущее 2.0»
+
+Person(biz_user, "Бизнес-пользователь", "Строит отчёты в портале")
+
+' --- Контексты как отдельные системы (System) ---
+System(customer_ctx, "Customer Context", "Мастер-данные клиентов")
+System(medical_ctx, "Medical Context", "Медицинские процессы")
+System(fintech_ctx, "Fintech Context", "Финансовые продукты")
+System(ai_ctx, "AI Context", "ИИ-модели для медицины")
+System(reporting_ctx, "Reporting Context", "Аналитическая витрина")
+
+' Общая событийная шина
+System_Ext(event_hub, "Event Hub (Kafka)", "Асинхронная коммуникация", $tags="v1.0")
+
+' --- Отношения (события) ---
+Rel(customer_ctx, event_hub, "Публикует CustomerCreated, CustomerUpdated", "Avro")
+Rel(medical_ctx, event_hub, "Публикует PatientRegistered, DiagnosisRecorded и др.", "Avro")
+Rel(fintech_ctx, event_hub, "Публикует CreditAgreementCreated, PaymentReceived и др.", "Avro")
+Rel(ai_ctx, event_hub, "Публикует AnalysisRequested, AnalysisCompleted и др.", "Avro")
+
+Rel(event_hub, reporting_ctx, "Потребляет все бизнес-события", "Stream Processing")
+Rel(biz_user, reporting_ctx, "Использует через Self-Service Portal", "HTTPS")
+
+' Необязательные межконтекстные подписки
+Rel(event_hub, medical_ctx, "Подписка на CustomerCreated (для синхронизации)", "Avro")
+Rel(event_hub, fintech_ctx, "Подписка на CustomerCreated", "Avro")
+Rel(event_hub, ai_ctx, "Подписка на PatientRegistered", "Avro")
+
+@enduml

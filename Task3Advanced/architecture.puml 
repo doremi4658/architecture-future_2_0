@@ -1,0 +1,67 @@
+@startuml
+!include <C4/C4_Container>
+!include <C4/C4_Context>
+
+title Система "Будущее 2.0" — целевая архитектура (3 года)
+
+Person(user, "Бизнес-пользователь", "Принимает решения на основе отчётов")
+
+System_Ext(legacy, "Legacy DWH / PowerBuilder", "Выводится из эксплуатации, используется как мост совместимости на этапе миграции")
+System_Ext(ext_sources, "Внешние источники данных", "IoT-устройства, партнёры, регуляторы")
+
+System_Boundary(platform, "Целевая архитектура (Yandex Cloud)") {
+    Container(portal, "Self-Service Portal", "React, nginx", "Витрина данных с возможностью конструирования отчётов. Не содержит медицинских карт")
+    Container(api_gateway, "API Gateway", "Kong / Nginx", "Единая точка входа с аутентификацией и авторизацией")
+    Container(event_hub, "Event Hub", "Apache Kafka", "Центральная событийная шина, обеспечивающая асинхронную коммуникацию доменов")
+    Container(stream_processor, "Stream Processor", "Flink / Kafka Streams", "Стриминговая обработка, построение потоковых витрин")
+    Container(storage_layer, "Storage Layer", "S3 / Yandex Object Storage + YDB", "Data Lake: сырые данные, обработанные события, витрины в колоночном формате (Parquet)")
+    Container(metadata, "Catalog & Schema Registry", "Apache Atlas + Schema Registry", "Каталог данных, схемы событий, lineage")
+    Container(monitoring, "Monitoring & Observability", "Prometheus + Grafana", "Метрики, трейсы, алерты")
+    Container(iam, "IAM & Secrets", "Yandex Cloud IAM + Vault", "Управление доступом, сертификаты, ротация ключей")
+
+    System_Boundary(d1, "Домен: Медицина") {
+        Container(med_service, "Medical Core", "Python/FastAPI", "Сервисы работы с мед. данными, диагностикой (ИИ-модели не входят в витрину)")
+        ContainerDb(med_db, "Med DB", "Managed PostgreSQL", "Оперативные данные клиник, история назначений (без DICOM/файлов)")
+    }
+
+    System_Boundary(d2, "Домен: Финтех") {
+        Container(fin_service, "Fintech Core", "Golang", "Кредиты, счета, финансовые операции")
+        ContainerDb(fin_db, "Fin DB", "Managed PostgreSQL", "Транзакционные данные финансового сервиса")
+    }
+
+    System_Boundary(d3, "Домен: ИИ-сервисы") {
+        Container(ai_service, "AI Engine", "Python ML", "Обучение и инференс медицинских моделей")
+        ContainerDb(ai_storage, "Model Registry", "S3 + MLflow", "Версионирование моделей и результатов")
+    }
+
+    System_Boundary(d4, "Домен: Интеграции и легаси-мост") {
+        Container(camel_bridge, "Legacy Bridge", "Camel K", "Переходный компонент для интеграции с ESB (Camel) и DWH до полного отказа")
+    }
+}
+
+Rel(user, portal, "Использует HTTPS", "JSON/HTTPS")
+Rel(portal, api_gateway, "Запросы через")
+Rel(api_gateway, event_hub, "Публикует запросы отчётов", "Avro (схемы)")
+
+Rel(event_hub, stream_processor, "Потребляет события")
+Rel(stream_processor, storage_layer, "Записывает агрегаты и витрины", "Parquet")
+Rel(portal, storage_layer, "Читает данные витрин", "SQL/Spark")
+
+Rel(med_service, event_hub, "Публикует события пациентов, диагнозов")
+Rel(fin_service, event_hub, "Публикует финансовые события")
+Rel(ai_service, event_hub, "Публикует результаты инференса")
+
+Rel(camel_bridge, event_hub, "Перенаправляет события из старой шины")
+Rel(legacy, camel_bridge, "Legacy интеграции", "JDBC/HTTP (deprecated)")
+
+Rel(ext_sources, camel_bridge, "Партнёрские API", "XML/JSON")
+Rel(ext_sources, event_hub, "Прямые поставки событий (будущие)")
+
+Rel(event_hub, metadata, "Регистрирует схемы")
+Rel(storage_layer, metadata, "Каталогизация датасетов")
+
+Rel(monitoring, event_hub, "Метрики кластера")
+Rel(monitoring, storage_layer, "Метрики загрузки")
+Rel(iam, api_gateway, "Авторизация запросов")
+
+@enduml
