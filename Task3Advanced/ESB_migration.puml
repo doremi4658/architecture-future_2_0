@@ -1,0 +1,38 @@
+@startuml
+!include <C4/C4_Container>
+
+title Целевая архитектура: перераспределение функций ESB
+
+Person(user, "Бизнес-пользователь")
+System_Ext(legacy, "Legacy Systems", "Источники, не поддерживающие Kafka напрямую")
+
+System_Boundary(platform, "Event-Driven Platform") {
+    Container(event_hub, "Event Hub (Kafka)", "Топики событий, Avro + Schema Registry")
+    Container(validation_service, "Validation Service", "Python/FastAPI", "Семантическая валидация сообщений перед публикацией")
+    Container(stream_processor, "Stream Processor (Flink/KSQL)", "Трансформации, обогащение, бизнес-логика на лету")
+    Container(api_gateway, "API Gateway", "Kong", "Маршрутизация синхронных вызовов внешних API")
+    Container(camel_bridge, "Legacy Bridge (Camel K)", "Адаптер для legacy-протоколов")
+    Container(reporting, "Self-Service Portal", "Чтение витрин")
+}
+
+' Legacy-системы отправляют данные через адаптер
+Rel(legacy, camel_bridge, "Пакетная передача", "JDBC/FTP")
+Rel(camel_bridge, validation_service, "Вызов валидации+трансформации перед Kafka")
+Rel(validation_service, event_hub, "Публикует валидные события", "Avro")
+Rel(camel_bridge, event_hub, "Прямая публикация простых событий", "Avro (если валидация не нужна)")
+
+' Маршрутизация и трансформации - в потоковом процессоре
+Rel(event_hub, stream_processor, "Читает сырые события")
+Rel(stream_processor, event_hub, "Публикует обработанные события", "Avro (обогащённые)")
+
+' Бизнес-логика: доменные сервисы подписываются и реагируют
+System_Boundary(d1, "Домен: Медицина") {
+    Container(med_service, "Medical Service")
+}
+Rel(med_service, event_hub, "Подписка на события диагнозов/назначений", "Avro")
+
+' Интеграции с внешними партнёрами - через API Gateway или Kafka Connect
+Rel(api_gateway, event_hub, "Проксирование запросов к партнёрам", "HTTP")
+note on link: Синхронные вызовы (например, проверка\nлекарственной совместимости) могут остаться\nв синхронном режиме через API Gateway
+
+@enduml
